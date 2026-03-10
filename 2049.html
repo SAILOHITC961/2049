@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CHRONO·NET — World Clock 2049</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --amber: #FFB347;
+    --amber-glow: rgba(255,140,0,0.35);
+    --cyan: #00E5FF;
+    --cyan-dim: rgba(0,229,255,0.15);
+    --cyan-glow: rgba(0,229,255,0.3);
+    --deep-red: #FF2D55;
+    --bg-void: #020408;
+    --bg-card: rgba(8,18,35,0.9);
+    --text-bright: #E8F4FF;
+    --text-dim: rgba(180,210,240,0.55);
+    --border-subtle: rgba(0,229,255,0.12);
+    --border-glow: rgba(0,229,255,0.4);
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  html,body{width:100%;min-height:100vh;background:var(--bg-void);font-family:'Share Tech Mono',monospace;color:var(--text-bright);overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.08) 2px,rgba(0,0,0,0.08) 4px);}
+  body::after{content:'';position:fixed;inset:0;z-index:999;pointer-events:none;opacity:0.03;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:200px 200px;}
+  #bg-canvas{position:fixed;inset:0;z-index:0;}
+  #app{position:relative;z-index:10;min-height:100vh;display:flex;flex-direction:column;max-width:1400px;margin:0 auto;padding:0 24px 80px;}
+
+  /* HEADER */
+  header{display:flex;align-items:center;justify-content:space-between;padding:32px 0 24px;border-bottom:1px solid var(--border-subtle);margin-bottom:36px;}
+  .logo-block{display:flex;flex-direction:column;gap:4px;}
+  .logo-title{font-family:'Orbitron',sans-serif;font-weight:900;font-size:clamp(18px,3vw,26px);letter-spacing:0.25em;color:var(--amber);text-shadow:0 0 20px var(--amber-glow),0 0 60px rgba(255,140,0,0.15);animation:glitch 8s infinite;}
+  .logo-title span{color:var(--cyan);text-shadow:0 0 20px var(--cyan-glow);}
+  .logo-sub{font-size:10px;letter-spacing:0.35em;color:var(--text-dim);text-transform:uppercase;}
+  .header-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;}
+  #master-clock{font-family:'Orbitron',sans-serif;font-weight:700;font-size:clamp(20px,3.5vw,34px);color:var(--cyan);text-shadow:0 0 24px var(--cyan-glow),0 0 80px rgba(0,229,255,0.1);letter-spacing:0.1em;}
+  #master-date{font-size:11px;letter-spacing:0.2em;color:var(--text-dim);text-align:right;}
+
+  /* SEARCH */
+  .search-wrapper{position:relative;margin-bottom:40px;}
+  .search-label{display:block;font-size:10px;letter-spacing:0.4em;color:var(--text-dim);margin-bottom:10px;text-transform:uppercase;}
+  .search-inner{display:flex;align-items:center;gap:14px;border:1px solid var(--border-glow);background:var(--bg-card);padding:0 20px;height:54px;clip-path:polygon(0 0,calc(100% - 16px) 0,100% 16px,100% 100%,16px 100%,0 calc(100% - 16px));transition:box-shadow 0.3s;}
+  .search-inner:focus-within{box-shadow:0 0 0 1px var(--cyan),0 0 30px var(--cyan-glow),inset 0 0 20px rgba(0,229,255,0.04);}
+  .search-icon{color:var(--cyan);font-size:18px;flex-shrink:0;opacity:0.7;}
+  #search-input{flex:1;background:transparent;border:none;outline:none;font-family:'Share Tech Mono',monospace;font-size:15px;color:var(--text-bright);caret-color:var(--amber);letter-spacing:0.05em;}
+  #search-input::placeholder{color:var(--text-dim);}
+  .search-hint{font-size:10px;color:var(--text-dim);letter-spacing:0.2em;flex-shrink:0;}
+
+  /* DROPDOWN */
+  #dropdown{display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:200;background:rgba(4,12,26,0.97);border:1px solid var(--border-glow);box-shadow:0 20px 60px rgba(0,0,0,0.8),0 0 40px var(--cyan-glow);max-height:280px;overflow-y:auto;clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px));}
+  #dropdown::-webkit-scrollbar{width:4px;}
+  #dropdown::-webkit-scrollbar-thumb{background:var(--cyan);border-radius:2px;}
+  .dropdown-item{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;cursor:pointer;border-bottom:1px solid rgba(0,229,255,0.06);transition:background 0.15s;}
+  .dropdown-item:hover{background:rgba(0,229,255,0.06);}
+  .di-left{display:flex;flex-direction:column;gap:3px;}
+  .di-city{font-size:14px;color:var(--text-bright);}
+  .di-region{font-size:11px;color:var(--text-dim);letter-spacing:0.15em;}
+  .di-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px;}
+  .di-offset{font-size:12px;color:var(--amber);font-family:'Orbitron',sans-serif;font-weight:600;}
+  .di-tz{font-size:10px;color:var(--text-dim);letter-spacing:0.1em;}
+  .no-results{padding:24px 20px;text-align:center;color:var(--text-dim);font-size:13px;letter-spacing:0.1em;}
+
+  /* FEATURED */
+  #featured-section{display:none;margin-bottom:48px;}
+  .section-label{font-size:10px;letter-spacing:0.4em;color:var(--amber);margin-bottom:20px;text-transform:uppercase;display:flex;align-items:center;gap:12px;}
+  .section-label::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--amber-glow),transparent);}
+  #featured-card{display:flex;flex-direction:column;background:linear-gradient(135deg,rgba(255,140,0,0.04),rgba(0,229,255,0.02));border:1px solid rgba(255,140,0,0.25);padding:48px 52px;clip-path:polygon(0 0,calc(100% - 24px) 0,100% 24px,100% 100%,24px 100%,0 calc(100% - 24px));box-shadow:0 0 60px rgba(255,140,0,0.07),inset 0 0 60px rgba(255,140,0,0.02);position:relative;overflow:hidden;}
+  #featured-card::before{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(90deg,transparent,transparent 3px,rgba(255,140,0,0.015) 3px,rgba(255,140,0,0.015) 4px);}
+  .corner-tl,.corner-br{position:absolute;width:20px;height:20px;pointer-events:none;}
+  .corner-tl{top:0;left:0;border-top:2px solid var(--cyan);border-left:2px solid var(--cyan);}
+  .corner-br{bottom:0;right:0;border-bottom:2px solid var(--cyan);border-right:2px solid var(--cyan);}
+  #featured-city{font-family:'Orbitron',sans-serif;font-weight:900;font-size:clamp(28px,5vw,52px);color:var(--amber);text-shadow:0 0 30px var(--amber-glow),0 0 80px rgba(255,140,0,0.1);letter-spacing:0.12em;line-height:1;margin-bottom:8px;}
+  #featured-region{font-size:13px;letter-spacing:0.35em;color:var(--text-dim);margin-bottom:28px;text-transform:uppercase;}
+  #featured-time{font-family:'Orbitron',sans-serif;font-weight:700;font-size:clamp(52px,10vw,100px);color:var(--cyan);text-shadow:0 0 30px var(--cyan-glow),0 0 80px rgba(0,229,255,0.15);letter-spacing:0.06em;line-height:1;margin-bottom:16px;}
+  .blink{animation:blink 1s step-end infinite;}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:0.15}}
+  #featured-date-line{font-size:13px;color:var(--text-dim);letter-spacing:0.2em;margin-bottom:24px;}
+  .feat-meta{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+  #featured-offset{display:inline-flex;align-items:center;font-family:'Orbitron',sans-serif;font-size:14px;font-weight:600;color:var(--amber);letter-spacing:0.15em;border:1px solid rgba(255,140,0,0.3);padding:6px 16px;background:rgba(255,140,0,0.06);}
+  #featured-tz{font-size:11px;color:var(--text-dim);letter-spacing:0.15em;}
+  .close-featured{position:absolute;top:16px;right:20px;background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:20px;font-family:monospace;transition:color 0.2s;}
+  .close-featured:hover{color:var(--deep-red);}
+
+  /* GRID */
+  .section-header-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;}
+  .grid-count{font-size:10px;letter-spacing:0.3em;color:var(--text-dim);}
+  #grid-count-num{color:var(--amber);}
+  #clocks-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;}
+
+  /* CARD */
+  .clock-card{background:var(--bg-card);border:1px solid var(--border-subtle);padding:28px 24px;cursor:pointer;clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px));transition:border-color 0.3s,box-shadow 0.3s,transform 0.2s;position:relative;overflow:hidden;}
+  .clock-card::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan-dim),transparent);opacity:0;transition:opacity 0.3s;}
+  .clock-card:hover{border-color:var(--border-glow);box-shadow:0 0 30px var(--cyan-glow),inset 0 0 30px rgba(0,229,255,0.02);transform:translateY(-3px);}
+  .clock-card:hover::after{opacity:1;}
+  .card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(0,229,255,0.08);}
+  .card-city{font-family:'Orbitron',sans-serif;font-weight:700;font-size:15px;color:var(--text-bright);letter-spacing:0.1em;}
+  .card-region{font-size:10px;letter-spacing:0.25em;color:var(--text-dim);margin-top:4px;text-transform:uppercase;}
+  .card-offset{font-family:'Orbitron',sans-serif;font-size:11px;font-weight:600;color:var(--amber);letter-spacing:0.1em;}
+  .card-digital{font-family:'Orbitron',sans-serif;font-weight:700;font-size:clamp(28px,4vw,36px);letter-spacing:0.06em;color:var(--cyan);text-shadow:0 0 16px var(--cyan-glow);text-align:center;padding:8px 0;}
+  .card-date{font-size:11px;color:var(--text-dim);letter-spacing:0.12em;text-align:center;margin-top:8px;}
+  .card-tz-badge{display:flex;justify-content:center;margin-top:16px;padding-top:14px;border-top:1px solid rgba(0,229,255,0.08);font-size:10px;color:var(--text-dim);letter-spacing:0.15em;opacity:0.6;}
+
+  /* FOOTER */
+  footer{position:fixed;bottom:0;left:0;right:0;z-index:50;background:rgba(2,4,8,0.92);border-top:1px solid var(--border-subtle);padding:8px 24px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(10px);}
+  .status-items{display:flex;align-items:center;gap:24px;}
+  .status-dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);box-shadow:0 0 6px var(--cyan);animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+  .status-text{font-size:10px;letter-spacing:0.25em;color:var(--text-dim);text-transform:uppercase;}
+  .status-version{font-family:'Orbitron',sans-serif;font-size:9px;color:var(--amber);letter-spacing:0.3em;opacity:0.6;}
+
+  @keyframes glitch{0%,94%,100%{text-shadow:0 0 20px var(--amber-glow),0 0 60px rgba(255,140,0,0.15);transform:none;}95%{text-shadow:-2px 0 var(--cyan),2px 0 var(--deep-red);transform:skewX(-1deg);}97%{text-shadow:2px 0 var(--cyan),-2px 0 var(--deep-red);transform:skewX(1deg);}}
+  @media(max-width:600px){#featured-card{padding:32px 24px;}#featured-time{font-size:clamp(40px,15vw,72px);}.status-text:not(:first-child){display:none;}}
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<div id="app">
+
+  <header>
+    <div class="logo-block">
+      <div class="logo-title">CHRONO<span>·</span>NET</div>
+      <div class="logo-sub">Global Temporal Interface · 2049 Edition</div>
+    </div>
+    <div class="header-right">
+      <div id="master-clock">--:--:--</div>
+      <div id="master-date">LOADING...</div>
+    </div>
+  </header>
+
+  <div class="search-wrapper">
+    <label class="search-label" for="search-input">⬡ Search timezone node</label>
+    <div class="search-inner">
+      <span class="search-icon">◈</span>
+      <input id="search-input" type="text" placeholder="Enter city, country, or region..." autocomplete="off" spellcheck="false"/>
+      <span class="search-hint">↵ SELECT</span>
+    </div>
+    <div id="dropdown"></div>
+  </div>
+
+  <section id="featured-section">
+    <div class="section-label">◆ Featured Timezone Node</div>
+    <div id="featured-card">
+      <div class="corner-tl"></div>
+      <div class="corner-br"></div>
+      <div id="featured-city">—</div>
+      <div id="featured-region">—</div>
+      <div id="featured-time">--<span class="blink">:</span>--<span class="blink">:</span>--</div>
+      <div id="featured-date-line">—</div>
+      <div class="feat-meta">
+        <div id="featured-offset">UTC +00:00</div>
+        <div id="featured-tz"></div>
+      </div>
+      <button class="close-featured" onclick="closeFeatured()">✕</button>
+    </div>
+  </section>
+
+  <div class="section-header-row">
+    <div class="section-label" style="margin-bottom:0;flex:1">◆ Active Timezone Nodes</div>
+    <div class="grid-count">NODES: <span id="grid-count-num">4</span></div>
+  </div>
+  <div id="clocks-grid"></div>
+
+</div>
+
+<footer>
+  <div class="status-items">
+    <div class="status-dot"></div>
+    <div class="status-text">System Online</div>
+    <div class="status-text">Intl.DateTimeFormat API Active</div>
+    <div class="status-text">Browser Computation Mode</div>
+  </div>
+  <div class="status-version">CHRONO·NET v4.9.2 · 2049</div>
+</footer>
+
+<script>
+// BACKGROUND
+(function(){
+  const canvas=document.getElementById('bg-canvas'),ctx=canvas.getContext('2d');
+  let W,H,drops=[];
+  function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
+  function init(){drops=[];const c=Math.floor(W/14);for(let i=0;i<c;i++)drops.push({x:Math.random()*W,y:Math.random()*H,speed:1.5+Math.random()*3,length:15+Math.random()*50,alpha:0.02+Math.random()*0.06,width:Math.random()>.85?1.5:.8});}
+  let frame=0;
+  function animate(){
+    ctx.fillStyle='rgba(2,4,8,0.18)';ctx.fillRect(0,0,W,H);
+    if(frame%120===0){ctx.strokeStyle='rgba(0,229,255,0.025)';ctx.lineWidth=.5;for(let x=0;x<W;x+=80){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}for(let y=0;y<H;y+=80){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}}
+    frame++;
+    for(let d of drops){const g=ctx.createLinearGradient(d.x,d.y,d.x,d.y+d.length);g.addColorStop(0,'rgba(0,229,255,0)');g.addColorStop(.6,`rgba(0,229,255,${d.alpha*.5})`);g.addColorStop(1,`rgba(255,140,0,${d.alpha})`);ctx.strokeStyle=g;ctx.lineWidth=d.width;ctx.beginPath();ctx.moveTo(d.x,d.y);ctx.lineTo(d.x,d.y+d.length);ctx.stroke();d.y+=d.speed;if(d.y-d.length>H){d.y=-d.length;d.x=Math.random()*W;}}
+    const s1=ctx.createRadialGradient(W*.1,H*.3,0,W*.1,H*.3,300);s1.addColorStop(0,'rgba(255,140,0,0.04)');s1.addColorStop(1,'transparent');ctx.fillStyle=s1;ctx.fillRect(0,0,W,H);
+    const s2=ctx.createRadialGradient(W*.9,H*.7,0,W*.9,H*.7,250);s2.addColorStop(0,'rgba(0,229,255,0.03)');s2.addColorStop(1,'transparent');ctx.fillStyle=s2;ctx.fillRect(0,0,W,H);
+    requestAnimationFrame(animate);
+  }
+  resize();init();animate();
+  window.addEventListener('resize',()=>{resize();init();});
+})();
+
+// DATA
+const ZONES=[
+  {city:'New York',region:'United States',tz:'America/New_York',offset:'UTC-05:00'},
+  {city:'Los Angeles',region:'United States',tz:'America/Los_Angeles',offset:'UTC-08:00'},
+  {city:'Chicago',region:'United States',tz:'America/Chicago',offset:'UTC-06:00'},
+  {city:'Toronto',region:'Canada',tz:'America/Toronto',offset:'UTC-05:00'},
+  {city:'Vancouver',region:'Canada',tz:'America/Vancouver',offset:'UTC-08:00'},
+  {city:'São Paulo',region:'Brazil',tz:'America/Sao_Paulo',offset:'UTC-03:00'},
+  {city:'Buenos Aires',region:'Argentina',tz:'America/Argentina/Buenos_Aires',offset:'UTC-03:00'},
+  {city:'Mexico City',region:'Mexico',tz:'America/Mexico_City',offset:'UTC-06:00'},
+  {city:'Bogotá',region:'Colombia',tz:'America/Bogota',offset:'UTC-05:00'},
+  {city:'Lima',region:'Peru',tz:'America/Lima',offset:'UTC-05:00'},
+  {city:'Santiago',region:'Chile',tz:'America/Santiago',offset:'UTC-04:00'},
+  {city:'London',region:'United Kingdom',tz:'Europe/London',offset:'UTC+00:00'},
+  {city:'Paris',region:'France',tz:'Europe/Paris',offset:'UTC+01:00'},
+  {city:'Berlin',region:'Germany',tz:'Europe/Berlin',offset:'UTC+01:00'},
+  {city:'Madrid',region:'Spain',tz:'Europe/Madrid',offset:'UTC+01:00'},
+  {city:'Rome',region:'Italy',tz:'Europe/Rome',offset:'UTC+01:00'},
+  {city:'Amsterdam',region:'Netherlands',tz:'Europe/Amsterdam',offset:'UTC+01:00'},
+  {city:'Zurich',region:'Switzerland',tz:'Europe/Zurich',offset:'UTC+01:00'},
+  {city:'Stockholm',region:'Sweden',tz:'Europe/Stockholm',offset:'UTC+01:00'},
+  {city:'Oslo',region:'Norway',tz:'Europe/Oslo',offset:'UTC+01:00'},
+  {city:'Helsinki',region:'Finland',tz:'Europe/Helsinki',offset:'UTC+02:00'},
+  {city:'Warsaw',region:'Poland',tz:'Europe/Warsaw',offset:'UTC+01:00'},
+  {city:'Athens',region:'Greece',tz:'Europe/Athens',offset:'UTC+02:00'},
+  {city:'Moscow',region:'Russia',tz:'Europe/Moscow',offset:'UTC+03:00'},
+  {city:'Istanbul',region:'Turkey',tz:'Europe/Istanbul',offset:'UTC+03:00'},
+  {city:'Lisbon',region:'Portugal',tz:'Europe/Lisbon',offset:'UTC+00:00'},
+  {city:'Dublin',region:'Ireland',tz:'Europe/Dublin',offset:'UTC+00:00'},
+  {city:'Dubai',region:'UAE',tz:'Asia/Dubai',offset:'UTC+04:00'},
+  {city:'Riyadh',region:'Saudi Arabia',tz:'Asia/Riyadh',offset:'UTC+03:00'},
+  {city:'Tel Aviv',region:'Israel',tz:'Asia/Jerusalem',offset:'UTC+02:00'},
+  {city:'Cairo',region:'Egypt',tz:'Africa/Cairo',offset:'UTC+02:00'},
+  {city:'Nairobi',region:'Kenya',tz:'Africa/Nairobi',offset:'UTC+03:00'},
+  {city:'Lagos',region:'Nigeria',tz:'Africa/Lagos',offset:'UTC+01:00'},
+  {city:'Johannesburg',region:'South Africa',tz:'Africa/Johannesburg',offset:'UTC+02:00'},
+  {city:'Tehran',region:'Iran',tz:'Asia/Tehran',offset:'UTC+03:30'},
+  {city:'Doha',region:'Qatar',tz:'Asia/Qatar',offset:'UTC+03:00'},
+  {city:'Delhi',region:'India',tz:'Asia/Kolkata',offset:'UTC+05:30'},
+  {city:'Mumbai',region:'India',tz:'Asia/Kolkata',offset:'UTC+05:30'},
+  {city:'Bangalore',region:'India',tz:'Asia/Kolkata',offset:'UTC+05:30'},
+  {city:'Karachi',region:'Pakistan',tz:'Asia/Karachi',offset:'UTC+05:00'},
+  {city:'Dhaka',region:'Bangladesh',tz:'Asia/Dhaka',offset:'UTC+06:00'},
+  {city:'Kathmandu',region:'Nepal',tz:'Asia/Kathmandu',offset:'UTC+05:45'},
+  {city:'Tokyo',region:'Japan',tz:'Asia/Tokyo',offset:'UTC+09:00'},
+  {city:'Seoul',region:'South Korea',tz:'Asia/Seoul',offset:'UTC+09:00'},
+  {city:'Beijing',region:'China',tz:'Asia/Shanghai',offset:'UTC+08:00'},
+  {city:'Shanghai',region:'China',tz:'Asia/Shanghai',offset:'UTC+08:00'},
+  {city:'Hong Kong',region:'China SAR',tz:'Asia/Hong_Kong',offset:'UTC+08:00'},
+  {city:'Singapore',region:'Singapore',tz:'Asia/Singapore',offset:'UTC+08:00'},
+  {city:'Kuala Lumpur',region:'Malaysia',tz:'Asia/Kuala_Lumpur',offset:'UTC+08:00'},
+  {city:'Jakarta',region:'Indonesia',tz:'Asia/Jakarta',offset:'UTC+07:00'},
+  {city:'Bangkok',region:'Thailand',tz:'Asia/Bangkok',offset:'UTC+07:00'},
+  {city:'Manila',region:'Philippines',tz:'Asia/Manila',offset:'UTC+08:00'},
+  {city:'Sydney',region:'Australia',tz:'Australia/Sydney',offset:'UTC+11:00'},
+  {city:'Melbourne',region:'Australia',tz:'Australia/Melbourne',offset:'UTC+11:00'},
+  {city:'Perth',region:'Australia',tz:'Australia/Perth',offset:'UTC+08:00'},
+  {city:'Auckland',region:'New Zealand',tz:'Pacific/Auckland',offset:'UTC+13:00'},
+  {city:'Honolulu',region:'USA Hawaii',tz:'Pacific/Honolulu',offset:'UTC-10:00'},
+  {city:'Anchorage',region:'USA Alaska',tz:'America/Anchorage',offset:'UTC-09:00'},
+];
+
+const DEFAULT_CITIES=['New York','London','Tokyo','Delhi'];
+let displayedZones=DEFAULT_CITIES.map(c=>ZONES.find(z=>z.city===c));
+let featuredZone=null;
+
+function getTimeStr(tz){return new Intl.DateTimeFormat('en-US',{timeZone:tz,hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date());}
+function getDateLong(tz){return new Intl.DateTimeFormat('en-US',{timeZone:tz,weekday:'long',year:'numeric',month:'long',day:'numeric'}).format(new Date()).toUpperCase();}
+function getDateShort(tz){return new Intl.DateTimeFormat('en-US',{timeZone:tz,weekday:'short',month:'short',day:'numeric'}).format(new Date()).toUpperCase();}
+
+function updateMasterClock(){
+  const n=new Date();
+  document.getElementById('master-clock').textContent=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}:${String(n.getSeconds()).padStart(2,'0')}`;
+  document.getElementById('master-date').textContent=new Intl.DateTimeFormat('en-US',{weekday:'short',year:'numeric',month:'short',day:'numeric',timeZoneName:'short'}).format(n).toUpperCase();
+}
+
+function createCard(zone){
+  const div=document.createElement('div');
+  div.className='clock-card';
+  div.innerHTML=`
+    <div class="card-header">
+      <div><div class="card-city">${zone.city}</div><div class="card-region">${zone.region}</div></div>
+      <div class="card-offset">${zone.offset}</div>
+    </div>
+    <div class="card-digital" data-tz-digital="${zone.tz}">--:--:--</div>
+    <div class="card-date" data-tz-date="${zone.tz}"></div>
+    <div class="card-tz-badge">${zone.tz}</div>`;
+  div.addEventListener('click',()=>openFeatured(zone));
+  return div;
+}
+
+function renderGrid(){
+  const g=document.getElementById('clocks-grid');
+  g.innerHTML='';
+  displayedZones.forEach(z=>g.appendChild(createCard(z)));
+  document.getElementById('grid-count-num').textContent=displayedZones.length;
+}
+
+function updateCards(){
+  document.querySelectorAll('[data-tz-digital]').forEach(el=>el.textContent=getTimeStr(el.dataset.tzDigital));
+  document.querySelectorAll('[data-tz-date]').forEach(el=>el.textContent=getDateShort(el.dataset.tzDate));
+}
+
+function openFeatured(zone){
+  featuredZone=zone;
+  document.getElementById('featured-city').textContent=zone.city;
+  document.getElementById('featured-region').textContent=zone.region;
+  document.getElementById('featured-offset').textContent=zone.offset;
+  document.getElementById('featured-tz').textContent=zone.tz;
+  document.getElementById('featured-section').style.display='block';
+  updateFeatured();
+  document.getElementById('featured-section').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function closeFeatured(){
+  featuredZone=null;
+  document.getElementById('featured-section').style.display='none';
+}
+
+function updateFeatured(){
+  if(!featuredZone)return;
+  const[h,m,s]=getTimeStr(featuredZone.tz).split(':');
+  document.getElementById('featured-time').innerHTML=`${h}<span class="blink">:</span>${m}<span class="blink">:</span>${s}`;
+  document.getElementById('featured-date-line').textContent=getDateLong(featuredZone.tz);
+}
+
+const searchInput=document.getElementById('search-input'),dropdown=document.getElementById('dropdown');
+
+searchInput.addEventListener('input',()=>{
+  const q=searchInput.value.trim().toLowerCase();
+  if(!q){dropdown.style.display='none';return;}
+  const results=ZONES.filter((z,i,arr)=>(z.city.toLowerCase().includes(q)||z.region.toLowerCase().includes(q)||z.tz.toLowerCase().includes(q))&&arr.findIndex(x=>x.tz===z.tz&&x.city===z.city)===i).slice(0,10);
+  if(!results.length){dropdown.innerHTML=`<div class="no-results">⬡ No timezone node found for "${searchInput.value}"</div>`;}
+  else{
+    dropdown.innerHTML=results.map(z=>`<div class="dropdown-item" data-tz="${z.tz}" data-city="${z.city}"><div class="di-left"><div class="di-city">${z.city}</div><div class="di-region">${z.region}</div></div><div class="di-right"><div class="di-offset">${z.offset}</div><div class="di-tz">${z.tz}</div></div></div>`).join('');
+    dropdown.querySelectorAll('.dropdown-item').forEach(item=>item.addEventListener('click',()=>{const zone=ZONES.find(z=>z.tz===item.dataset.tz&&z.city===item.dataset.city);if(zone)selectZone(zone);}));
+  }
+  dropdown.style.display='block';
+});
+
+document.addEventListener('click',e=>{if(!e.target.closest('.search-wrapper'))dropdown.style.display='none';});
+searchInput.addEventListener('keydown',e=>{if(e.key==='Escape'){dropdown.style.display='none';searchInput.blur();}});
+
+function selectZone(zone){
+  dropdown.style.display='none';searchInput.value='';
+  if(!displayedZones.find(z=>z.tz===zone.tz&&z.city===zone.city)){displayedZones.push(zone);renderGrid();}
+  openFeatured(zone);
+}
+
+function tick(){updateMasterClock();updateCards();updateFeatured();}
+renderGrid();tick();setInterval(tick,1000);
+</script>
+</body>
+</html>
